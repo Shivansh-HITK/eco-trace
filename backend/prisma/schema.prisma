@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  INDIVIDUAL
+  NGO
+  DRIVER
+  ADMIN
+}
+
+enum ItemStatus {
+  REGISTERED
+  PICKED_UP
+  IN_TRANSIT
+  AT_SORTING_CENTER
+  RECYCLED_DISPOSED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  phone        String?       @unique
+  passwordHash String?
+  role         Role
+  name         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  otpCodes     OTPCode[]
+  items        EWasteItem[]  @relation("OwnerItems")
+  ngoProfile   NGOProfile?
+  driverProfile DriverProfile?
+}
+
+model NGOProfile {
+  id         String            @id @default(cuid())
+  user       User              @relation(fields: [userId], references: [id])
+  userId     String            @unique
+  orgName    String
+  address    String?
+  drivers    DriverProfile[]
+  assignments PickupAssignment[]
+  items      EWasteItem[]      @relation("NGOItems")
+}
+
+model DriverProfile {
+  id         String            @id @default(cuid())
+  user       User              @relation(fields: [userId], references: [id])
+  userId     String            @unique
+  vehicleNumber String?
+  assignments PickupAssignment[]
+  items      EWasteItem[]      @relation("DriverItems")
+}
+
+model EWasteItem {
+  id            String         @id @default(cuid())
+  publicId      String         @unique
+  owner         User           @relation("OwnerItems", fields: [ownerId], references: [id])
+  ownerId       String
+  ngo           NGOProfile?    @relation("NGOItems", fields: [ngoId], references: [id])
+  ngoId         String?
+  driver        DriverProfile? @relation("DriverItems", fields: [driverId], references: [id])
+  driverId      String?
+  type          String
+  brand         String?
+  model         String?
+  weightKg      Float?
+  condition     String?
+  photoUrl      String?
+  qrSignedPayload String?
+  status        ItemStatus     @default(REGISTERED)
+  statusHistory StatusHistory[]
+  assignment    PickupAssignment? @relation(fields: [assignmentId], references: [id])
+  assignmentId  String?
+  submittedAt   DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  geolocation   String?
+}
+
+model StatusHistory {
+  id         String      @id @default(cuid())
+  item       EWasteItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId     String
+  status     ItemStatus
+  note       String?
+  actorUserId String?
+  geo        String?
+  createdAt  DateTime    @default(now())
+}
+
+model PickupAssignment {
+  id         String        @id @default(cuid())
+  ngo        NGOProfile    @relation(fields: [ngoId], references: [id])
+  ngoId      String
+  driver     DriverProfile @relation(fields: [driverId], references: [id])
+  driverId   String
+  items      EWasteItem[]
+  createdAt  DateTime      @default(now())
+  pickupTime DateTime?
+  status     String        @default("ASSIGNED")
+}
+
+model OTPCode {
+  id         String    @id @default(cuid())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  code       String
+  expiresAt  DateTime
+  consumed   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+}
